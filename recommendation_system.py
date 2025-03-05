@@ -265,3 +265,75 @@ class SimilarityCalculator:
 
         return similarity
 
+
+class UserBasedRecommender:
+    """Generates recommendations based on similar users' behaviors."""
+
+    def __init__(self, data_loader, similarity_calculator):
+        self.data_loader = data_loader
+        self.similarity_calculator = similarity_calculator
+
+    def recommend(self, user_id, n=5, exclude_viewed=False, exclude_purchased=True):
+        """
+        Generate recommendations for a user based on similar users' interactions.
+
+        Parameters:
+        - user_id: The ID of the user to recommend for
+        - n: Number of recommendations to generate
+        - exclude_viewed: Whether to exclude products the user has already viewed
+        - exclude_purchased: Whether to exclude products the user has already purchased
+
+        Returns:
+        - List of recommended product IDs
+        """
+        # Get user interactions
+        user_interactions = self.data_loader.get_user_interactions(user_id)
+
+        # Products the user has already interacted with
+        viewed_products = set(b["product_id"] for b in user_interactions["browsing"])
+        purchased_products = set(
+            p["product_id"] for p in user_interactions["purchases"]
+        )
+
+        # Products to exclude
+        excluded_products = set()
+        if exclude_viewed:
+            excluded_products.update(viewed_products)
+        if exclude_purchased:
+            excluded_products.update(purchased_products)
+
+        # Get similar users
+        similar_users = self.similarity_calculator.get_similar_users(user_id, n=10)
+
+        # If no similar users found, return empty list
+        if not similar_users:
+            logger.warning(f"No similar users found for user {user_id}")
+            return []
+
+        # Get products that similar users have interacted with
+        product_scores = defaultdict(float)
+
+        for similar_user_id in similar_users:
+            similar_user_interactions = self.data_loader.get_user_interactions(
+                similar_user_id
+            )
+
+            # Score viewed products
+            for interaction in similar_user_interactions["browsing"]:
+                product_id = interaction["product_id"]
+                if product_id not in excluded_products:
+                    product_scores[product_id] += 1
+
+            # Score purchased products (with higher weight)
+            for interaction in similar_user_interactions["purchases"]:
+                product_id = interaction["product_id"]
+                if product_id not in excluded_products:
+                    product_scores[product_id] += 5 * interaction.get("quantity", 1)
+
+        # Sort products by score and get top n
+        recommended_products = heapq.nlargest(
+            n, product_scores.items(), key=lambda x: x[1]
+        )
+
+        return [product_id for product_id, score in recommended_products]
+
