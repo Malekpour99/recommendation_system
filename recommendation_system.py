@@ -3,6 +3,9 @@ import logging
 import pandas as pd
 from datetime import datetime
 from collections import defaultdict
+from sklearn.metrics.pairwise import cosine_similarity
+from typing import List, Dict, Tuple, Optional, Set, Any
+
 
 # Configure logging
 logging.basicConfig(
@@ -193,4 +196,46 @@ class SimilarityCalculator:
         )
 
         return self.product_similarity_matrix
+
+    def get_similar_users(self, user_id, n=5):
+        """Get top n users similar to the given user."""
+        if self.user_similarity_matrix is None:
+            self.calculate_user_similarities()
+
+        if user_id not in self.user_similarity_matrix.index:
+            logger.warning(f"User {user_id} not found in similarity matrix")
+            return []
+
+        # Get similarities for the user
+        similarities = self.user_similarity_matrix.loc[user_id]
+
+        # Sort and get top n (excluding the user itself)
+        similar_users = (
+            similarities.sort_values(ascending=False)
+            .drop(user_id, errors="ignore")
+            .head(n)
+        )
+
+        return similar_users.index.tolist()
+
+    def get_similar_products(self, product_id, n=5):
+        """Get top n products similar to the given product."""
+        if self.product_similarity_matrix is None:
+            self.calculate_product_similarities()
+
+        if product_id not in self.product_similarity_matrix.index:
+            logger.warning(f"Product {product_id} not found in similarity matrix")
+            return []
+
+        # Get similarities for the product
+        similarities = self.product_similarity_matrix.loc[product_id]
+
+        # Sort and get top n (excluding the product itself)
+        similar_products = (
+            similarities.sort_values(ascending=False)
+            .drop(product_id, errors="ignore")
+            .head(n)
+        )
+
+        return similar_products.index.tolist()
 
