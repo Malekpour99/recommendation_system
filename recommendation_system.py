@@ -80,3 +80,13 @@ class DataLoader:
 
         return {"browsing": browsing, "purchases": purchases}
 
+    def get_product_interactions(self, product_id):
+        """Get all interactions for a specific product."""
+        # Ensure timestamps are converted
+        self._convert_timestamps()
+
+        browsing = [b for b in self.browsing_history if b["product_id"] == product_id]
+        purchases = [p for p in self.purchase_history if p["product_id"] == product_id]
+
+        return {"browsing": browsing, "purchases": purchases}
+
