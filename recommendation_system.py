@@ -413,3 +413,76 @@ class ItemBasedRecommender:
 
         return [product_id for product_id, score in recommended_products]
 
+
+class ContextualBooster:
+    """Adjusts recommendation scores based on contextual signals."""
+
+    def __init__(self, data_loader):
+        self.data_loader = data_loader
+
+    def boost_scores(self, product_scores, user_id, current_time=None):
+        """
+        Boost product scores based on contextual signals.
+
+        Parameters:
+        - product_scores: Dictionary of product IDs to scores
+        - user_id: The ID of the user
+        - current_time: Current datetime (defaults to now if None)
+
+        Returns:
+        - Dictionary of product IDs to boosted scores
+        """
+        if current_time is None:
+            current_time = datetime.now()
+
+        # Get user device
+        user_device = self.data_loader.users[user_id]["device"]
+
+        # Get day of week
+        day_of_week = current_time.strftime("%A")
+
+        # Get season (simplified)
+        month = current_time.month
+        if 3 <= month <= 5:
+            season = "Spring"
+        elif 6 <= month <= 8:
+            season = "Summer"
+        elif 9 <= month <= 11:
+            season = "Fall"
+        else:
+            season = "Winter"
+
+        # For simplicity, map Back-to-School to Fall and Holiday to Winter
+        season_mapping = {"Fall": "Back-to-School", "Winter": "Holiday"}
+
+        # Boost scores based on contextual signals
+        boosted_scores = dict(product_scores)
+
+        for product_id in product_scores:
+            product = self.data_loader.products[product_id]
+            category = product["category"]
+
+            # Boost based on contextual signals if available for the category
+            if category in self.data_loader.contextual_signals:
+                signal = self.data_loader.contextual_signals[category]
+
+                # Boost if current day is a peak day for the category
+                if day_of_week in signal["peak_days"]:
+                    boosted_scores[product_id] *= 1.2
+
+                # Boost if current season matches the category's peak season
+                mapped_season = season_mapping.get(season, season)
+                if signal["season"] == mapped_season or signal["season"] == "All Year":
+                    boosted_scores[product_id] *= 1.3
+
+            # Boost based on device type (simplified)
+            # Assume mobile users prefer certain categories
+            if user_device == "mobile":
+                if category in ["Electronics", "Accessories"]:
+                    boosted_scores[product_id] *= 1.1
+            else:  # desktop
+                if category in ["Office Supplies"]:
+                    boosted_scores[product_id] *= 1.1
+
+        return boosted_scores
+
