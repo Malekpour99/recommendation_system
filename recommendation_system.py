@@ -70,3 +70,13 @@ class DataLoader:
                     # Optionally, set to a default timestamp or current time
                     interaction["timestamp"] = datetime.now()
 
+    def get_user_interactions(self, user_id):
+        """Get all interactions for a specific user."""
+        # Ensure timestamps are converted
+        self._convert_timestamps()
+
+        browsing = [b for b in self.browsing_history if b["user_id"] == user_id]
+        purchases = [p for p in self.purchase_history if p["user_id"] == user_id]
+
+        return {"browsing": browsing, "purchases": purchases}
+
