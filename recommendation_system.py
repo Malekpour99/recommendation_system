@@ -139,3 +139,58 @@ class DataLoader:
 
         return user_item_matrix
 
+
+class SimilarityCalculator:
+    """Calculates similarities between users and between products."""
+
+    def __init__(self, data_loader):
+        self.data_loader = data_loader
+        self.user_similarity_matrix = None
+        self.product_similarity_matrix = None
+
+    def calculate_user_similarities(self):
+        """Calculate similarities between users based on their interactions."""
+        user_item_matrix = self.data_loader.create_user_item_matrix()
+
+        # If matrix is empty, return empty similarity matrix
+        if user_item_matrix.empty:
+            logger.warning(
+                "User-item matrix is empty, cannot calculate user similarities"
+            )
+            return pd.DataFrame()
+
+        # Calculate cosine similarity
+        user_similarity = cosine_similarity(user_item_matrix)
+
+        # Convert to DataFrame for easier manipulation
+        self.user_similarity_matrix = pd.DataFrame(
+            user_similarity,
+            index=user_item_matrix.index,
+            columns=user_item_matrix.index,
+        )
+
+        return self.user_similarity_matrix
+
+    def calculate_product_similarities(self):
+        """Calculate similarities between products based on user interactions."""
+        user_item_matrix = self.data_loader.create_user_item_matrix()
+
+        # If matrix is empty, return empty similarity matrix
+        if user_item_matrix.empty:
+            logger.warning(
+                "User-item matrix is empty, cannot calculate product similarities"
+            )
+            return pd.DataFrame()
+
+        # Calculate cosine similarity between products (transpose the matrix first)
+        product_similarity = cosine_similarity(user_item_matrix.T)
+
+        # Convert to DataFrame for easier manipulation
+        self.product_similarity_matrix = pd.DataFrame(
+            product_similarity,
+            index=user_item_matrix.columns,
+            columns=user_item_matrix.columns,
+        )
+
+        return self.product_similarity_matrix
+
