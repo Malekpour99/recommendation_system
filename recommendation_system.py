@@ -1,7 +1,8 @@
+import heapq
+import logging
+import pandas as pd
 from datetime import datetime
 from collections import defaultdict
-import time
-import logging
 
 # Configure logging
 logging.basicConfig(
@@ -89,4 +90,52 @@ class DataLoader:
         purchases = [p for p in self.purchase_history if p["product_id"] == product_id]
 
         return {"browsing": browsing, "purchases": purchases}
+
+    def create_user_item_matrix(self, interaction_type="all"):
+        """
+        Create a user-item interaction matrix.
+
+        Parameters:
+        - interaction_type: 'browsing', 'purchase', or 'all'
+
+        Returns:
+        - user_item_matrix: DataFrame with users as rows, items as columns, values as interaction strength
+        """
+        interactions = []
+
+        if interaction_type in ["browsing", "all"]:
+            for interaction in self.browsing_history:
+                interactions.append(
+                    {
+                        "user_id": interaction["user_id"],
+                        "product_id": interaction["product_id"],
+                        "value": 1,  # Value of 1 for a view
+                    }
+                )
+
+        if interaction_type in ["purchase", "all"]:
+            for interaction in self.purchase_history:
+                interactions.append(
+                    {
+                        "user_id": interaction["user_id"],
+                        "product_id": interaction["product_id"],
+                        "value": 5
+                        * interaction.get(
+                            "quantity", 1
+                        ),  # Value of 5 * quantity for a purchase
+                    }
+                )
+
+        # Create DataFrame from interactions
+        df = pd.DataFrame(interactions)
+
+        # If there are multiple interactions between the same user and product, take the sum
+        df = df.groupby(["user_id", "product_id"]).sum().reset_index()
+
+        # Create the matrix
+        user_item_matrix = df.pivot(
+            index="user_id", columns="product_id", values="value"
+        ).fillna(0)
+
+        return user_item_matrix
 
