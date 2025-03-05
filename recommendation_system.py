@@ -627,3 +627,221 @@ class ExplanationGenerator:
         else:
             return f"Recommended for you."
 
+
+class RecommendationManager:
+    """Orchestrates the entire recommendation process."""
+
+    def __init__(self, data_loader):
+        self.data_loader = data_loader
+        self.similarity_calculator = SimilarityCalculator(data_loader)
+        self.user_based_recommender = UserBasedRecommender(
+            data_loader, self.similarity_calculator
+        )
+        self.item_based_recommender = ItemBasedRecommender(
+            data_loader, self.similarity_calculator
+        )
+        self.contextual_booster = ContextualBooster(data_loader)
+        self.diversity_enhancer = DiversityEnhancer(data_loader)
+        self.explanation_generator = ExplanationGenerator(
+            data_loader, self.similarity_calculator
+        )
+
+        # Pre-compute similarities
+        logger.info("Pre-computing user similarities...")
+        self.similarity_calculator.calculate_user_similarities()
+
+        logger.info("Pre-computing product similarities...")
+        self.similarity_calculator.calculate_product_similarities()
+
+    def generate_candidates(self, user_id):
+        """
+        Generate candidate products for recommendations.
+
+        Parameters:
+        - user_id: The ID of the user
+
+        Returns:
+        - Dictionary of candidate product IDs with initial scores
+        """
+        # Get user interactions
+        user_interactions = self.data_loader.get_user_interactions(user_id)
+
+        # Initialize candidate dictionary
+        candidates = {}
+
+        # 1. Viewed but not purchased products
+        viewed_products = set(b["product_id"] for b in user_interactions["browsing"])
+        purchased_products = set(
+            p["product_id"] for p in user_interactions["purchases"]
+        )
+        viewed_not_purchased = viewed_products - purchased_products
+
+        for product_id in viewed_not_purchased:
+            candidates[product_id] = 3.0  # Moderate initial score
+
+        # 2. User-based recommendations
+        user_based_recs = self.user_based_recommender.recommend(
+            user_id, n=5, exclude_viewed=True, exclude_purchased=True
+        )
+        for product_id in user_based_recs:
+            candidates[product_id] = candidates.get(product_id, 0) + 5.0
+
+        # 3. Item-based recommendations
+        item_based_recs = self.item_based_recommender.recommend(
+            user_id, n=5, exclude_viewed=True, exclude_purchased=True
+        )
+        for product_id in item_based_recs:
+            candidates[product_id] = candidates.get(product_id, 0) + 4.0
+
+        # 4. Popular products in user's preferred categories
+        if user_interactions["purchases"]:
+            preferred_categories = set(
+                self.data_loader.products[p["product_id"]]["category"]
+                for p in user_interactions["purchases"]
+            )
+
+            for product_id, product in self.data_loader.products.items():
+                if (
+                    product["category"] in preferred_categories
+                    and product_id not in candidates
+                ):
+                    candidates[product_id] = 2.0
+
+        # 5. Trending products (simplified)
+        for product_id, product in self.data_loader.products.items():
+            product_interactions = self.data_loader.get_product_interactions(product_id)
+            interaction_count = len(product_interactions["browsing"]) + len(
+                product_interactions["purchases"]
+            )
+
+            if product_id not in candidates and interaction_count > 0:
+                candidates[product_id] = 1.5 * interaction_count
+
+        return candidates
+
+    def score_candidates(self, user_id, candidates):
+        """
+        Score and refine candidate products.
+
+        Parameters:
+        - user_id: The ID of the user
+        - candidates: Dictionary of candidate product IDs with initial scores
+
+        Returns:
+        - Dictionary of product IDs to final scores
+        """
+        # Normalize and adjust candidate scores
+        max_score = max(candidates.values()) if candidates else 1
+
+        scored_candidates = {
+            product_id: score / max_score * 10  # Normalize to 0-10 scale
+            for product_id, score in candidates.items()
+        }
+
+        return scored_candidates
+
+    def get_recommendations(self, user_id, n=5, include_explanations=True):
+        """
+        Get personalized recommendations for a user.
+
+        Parameters:
+        - user_id: The ID of the user
+        - n: Number of recommendations to return
+        - include_explanations: Whether to include explanations
+
+        Returns:
+        - List of recommended products (with explanations if requested)
+        """
+        # Check if user exists
+        if user_id not in self.data_loader.users:
+            logger.warning(f"User {user_id} not found")
+            return []
+
+        # Get user interactions
+        user_interactions = self.data_loader.get_user_interactions(user_id)
+
+        # Handle cold start scenario for new users
+        if not user_interactions["browsing"] and not user_interactions["purchases"]:
+            logger.info(f"Cold start: User {user_id} has no interactions")
+
+            # Recommend popular products across categories
+            candidates = {}
+            for product_id, product in self.data_loader.products.items():
+                product_interactions = self.data_loader.get_product_interactions(
+                    product_id
+                )
+                interaction_count = len(product_interactions["browsing"]) + len(
+                    product_interactions["purchases"]
+                )
+                candidates[product_id] = interaction_count
+
+            recommended_product_ids = sorted(
+                candidates, key=candidates.get, reverse=True
+            )[:n]
+
+            if include_explanations:
+                return [
+                    {
+                        "product_id": pid,
+                        "product_name": self.data_loader.products[pid]["name"],
+                        "explanation": "Recommended as a popular product for new users",
+                    }
+                    for pid in recommended_product_ids
+                ]
+            else:
+                return recommended_product_ids
+
+        # Generate candidates
+        candidates = self.generate_candidates(user_id)
+
+        # Score candidates
+        candidate_scores = self.score_candidates(user_id, candidates)
+
+        # Boost scores based on contextual signals
+        boosted_scores = self.contextual_booster.boost_scores(candidate_scores, user_id)
+
+        # Convert to (product_id, score) tuples
+        recommendations = [
+            (product_id, score) for product_id, score in boosted_scores.items()
+        ]
+
+        # Sort by score
+        recommendations.sort(key=lambda x: x[1], reverse=True)
+
+        # Enhance diversity
+        diverse_recommendations = self.diversity_enhancer.enhance_diversity(
+            recommendations, n
+        )
+
+        # Add explanations if requested
+        if include_explanations:
+            result = []
+            for product_id in diverse_recommendations:
+                product = self.data_loader.products[product_id]
+
+                # Determine the source of the recommendation
+                source = "item_based"  # Default source
+                if product_id in [
+                    b["product_id"]
+                    for b in user_interactions["browsing"]
+                    if b["product_id"]
+                    not in [p["product_id"] for p in user_interactions["purchases"]]
+                ]:
+                    source = "viewed_not_purchased"
+
+                # Generate explanation
+                explanation = self.explanation_generator.generate_explanation(
+                    user_id, product_id, source
+                )
+
+                result.append(
+                    {
+                        "product_id": product_id,
+                        "product_name": product["name"],
+                        "explanation": explanation,
+                    }
+                )
+
+            return result
+        else:
+            return diverse_recommendations
