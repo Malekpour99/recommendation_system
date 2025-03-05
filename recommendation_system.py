@@ -337,3 +337,79 @@ class UserBasedRecommender:
 
         return [product_id for product_id, score in recommended_products]
 
+
+class ItemBasedRecommender:
+    """Generates recommendations based on similar products."""
+
+    def __init__(self, data_loader, similarity_calculator):
+        self.data_loader = data_loader
+        self.similarity_calculator = similarity_calculator
+
+    def recommend(self, user_id, n=5, exclude_viewed=False, exclude_purchased=True):
+        """
+        Generate recommendations for a user based on similar products.
+
+        Parameters:
+        - user_id: The ID of the user to recommend for
+        - n: Number of recommendations to generate
+        - exclude_viewed: Whether to exclude products the user has already viewed
+        - exclude_purchased: Whether to exclude products the user has already purchased
+
+        Returns:
+        - List of recommended product IDs
+        """
+        # Get user interactions
+        user_interactions = self.data_loader.get_user_interactions(user_id)
+
+        # Products the user has already interacted with
+        viewed_products = set(b["product_id"] for b in user_interactions["browsing"])
+        purchased_products = set(
+            p["product_id"] for p in user_interactions["purchases"]
+        )
+
+        # Products to exclude
+        excluded_products = set()
+        if exclude_viewed:
+            excluded_products.update(viewed_products)
+        if exclude_purchased:
+            excluded_products.update(purchased_products)
+
+        # Products the user has interacted with (to find similar products)
+        interacted_products = viewed_products.union(purchased_products)
+
+        # If user hasn't interacted with any products, return empty list
+        if not interacted_products:
+            logger.warning(f"User {user_id} has no interactions")
+            return []
+
+        # Get similar products
+        product_scores = defaultdict(float)
+
+        for product_id in interacted_products:
+            # Get weight based on interaction type
+            weight = 5 if product_id in purchased_products else 1
+
+            # Get similar products
+            similar_products = self.similarity_calculator.get_similar_products(
+                product_id, n=10
+            )
+
+            for similar_product_id in similar_products:
+                if similar_product_id not in excluded_products:
+                    # Calculate content-based similarity to further refine the score
+                    content_similarity = (
+                        self.similarity_calculator.calculate_product_content_similarity(
+                            product_id, similar_product_id
+                        )
+                    )
+
+                    # Add weighted score
+                    product_scores[similar_product_id] += weight * content_similarity
+
+        # Sort products by score and get top n
+        recommended_products = heapq.nlargest(
+            n, product_scores.items(), key=lambda x: x[1]
+        )
+
+        return [product_id for product_id, score in recommended_products]
+
