@@ -239,3 +239,29 @@ class SimilarityCalculator:
 
         return similar_products.index.tolist()
 
+    def calculate_product_content_similarity(self, product1, product2):
+        """Calculate content-based similarity between two products."""
+        p1 = self.data_loader.products[product1]
+        p2 = self.data_loader.products[product2]
+
+        # Calculate similarity based on tags
+        tags1 = set(p1["tags"])
+        tags2 = set(p2["tags"])
+
+        tag_similarity = len(tags1.intersection(tags2)) / max(
+            len(tags1.union(tags2)), 1
+        )
+
+        # Category similarity (1 if same, 0 if different)
+        category_similarity = 1 if p1["category"] == p2["category"] else 0
+
+        # Rating similarity
+        rating_similarity = 1 - abs(p1["rating"] - p2["rating"]) / 5
+
+        # Weighted combination
+        similarity = (
+            0.5 * tag_similarity + 0.3 * category_similarity + 0.2 * rating_similarity
+        )
+
+        return similarity
+
