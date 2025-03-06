@@ -1,6 +1,4 @@
-import sys
 import logging
-from datetime import datetime
 
 from recommendation_system import DataLoader, RecommendationManager
 
