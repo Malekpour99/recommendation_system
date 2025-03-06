@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple
 
-from recommendation_system import DataLoader, RecommendationManager
+from recommendation_system import DataProcessor, RecommendationManager
 
 
 def generate_large_dataset(
@@ -129,8 +129,8 @@ def benchmark_recommendation_performance(
     Returns:
         list: A list of recommendation generation times for sample users.
     """
-    data_loader = DataLoader()
-    data_loader.load_data(
+    data_processor = DataProcessor()
+    data_processor.load_data(
         users_data,
         products_data,
         browsing_history,
@@ -138,7 +138,7 @@ def benchmark_recommendation_performance(
         contextual_signals,
     )
 
-    recommendation_manager = RecommendationManager(data_loader)
+    recommendation_manager = RecommendationManager(data_processor)
 
     # Measure recommendation generation time
     recommendation_times = []

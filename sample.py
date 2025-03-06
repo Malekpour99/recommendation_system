@@ -1,6 +1,7 @@
 import logging
 
-from recommendation_system import DataLoader, RecommendationManager
+from data_handling.data_processor import DataProcessor
+from recommendation_system import RecommendationManager
 
 # Configure logging
 logging.basicConfig(
@@ -109,7 +110,7 @@ def run_recommendation_tests():
     """Run comprehensive tests on the recommendation system."""
 
     # Initialize data loader
-    data_loader = DataLoader()
+    data_processor = DataProcessor()
 
     # Ensure all timestamps are strings
     processed_browsing_history = [
@@ -136,7 +137,7 @@ def run_recommendation_tests():
         for item in purchase_history
     ]
 
-    data_loader.load_data(
+    data_processor.load_data(
         users_data,
         products_data,
         processed_browsing_history,
@@ -145,7 +146,7 @@ def run_recommendation_tests():
     )
 
     # Initialize recommendation manager
-    recommendation_manager = RecommendationManager(data_loader)
+    recommendation_manager = RecommendationManager(data_processor)
 
     # Test recommendations for each user
     print("\n--- Recommendation Tests ---")
@@ -165,7 +166,7 @@ def run_recommendation_tests():
     # Test cold start scenario (with a new user)
     print("\n--- Cold Start Test ---")
     cold_start_user_id = 5
-    data_loader.users[cold_start_user_id] = {
+    data_processor.users[cold_start_user_id] = {
         "user_id": 5,
         "name": "Eve",
         "location": "Denver",
