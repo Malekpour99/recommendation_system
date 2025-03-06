@@ -1,11 +1,11 @@
 import heapq
 import logging
-import pandas as pd
 from datetime import datetime
 from collections import defaultdict
-from sklearn.metrics.pairwise import cosine_similarity
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Dict, Tuple, Optional
 
+from data_handling.data_processor import DataProcessor
+from data_handling.similarity_calculator import SimilarityCalculator
 
 # Configure logging
 logging.basicConfig(
@@ -14,274 +14,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class DataLoader:
-    """Loads and preprocesses the e-commerce data for the recommendation system."""
-
-    def __init__(self) -> None:
-        self.users: Dict[int, Dict[str, Any]] = {}
-        self.products: Dict[int, Dict[str, Any]] = {}
-        self.browsing_history: List[Dict[str, Any]] = []
-        self.purchase_history: List[Dict[str, Any]] = []
-        self.contextual_signals: Dict[str, Dict[str, Any]] = {}
-
-    def load_data(
-        self,
-        users_data: List[Dict[str, Any]],
-        products_data: List[Dict[str, Any]],
-        browsing_data: List[Dict[str, Any]],
-        purchase_data: List[Dict[str, Any]],
-        contextual_data: List[Dict[str, Any]],
-    ) -> None:
-        """Load data from the provided datasets."""
-        # Load users
-        for user in users_data:
-            self.users[user["user_id"]] = user
-
-        # Load products
-        for product in products_data:
-            self.products[product["product_id"]] = product
-
-        # Load browsing history
-        self.browsing_history = browsing_data
-
-        # Load purchase history
-        self.purchase_history = purchase_data
-
-        # Load contextual signals
-        for signal in contextual_data:
-            self.contextual_signals[signal["category"]] = signal
-
-        # Ensure timestamps are converted to datetime
-        self._convert_timestamps()
-
-        logger.info(f"Loaded {len(self.users)} users, {len(self.products)} products")
-        logger.info(
-            f"Loaded {len(self.browsing_history)} browsing events, {len(self.purchase_history)} purchase events"
-        )
-
-    def _convert_timestamps(self) -> None:
-        """Convert all timestamps to datetime objects."""
-        for interaction in self.browsing_history + self.purchase_history:
-            # If timestamp is already a datetime, skip
-            if isinstance(interaction["timestamp"], datetime):
-                continue
-
-            # If timestamp is a string, convert to datetime
-            if isinstance(interaction["timestamp"], str):
-                try:
-                    interaction["timestamp"] = datetime.strptime(
-                        interaction["timestamp"], "%Y-%m-%d %H:%M:%S"
-                    )
-                except ValueError:
-                    logger.warning(
-                        f"Could not parse timestamp: {interaction['timestamp']}"
-                    )
-                    # Optionally, set to a default timestamp or current time
-                    interaction["timestamp"] = datetime.now()
-
-    def get_user_interactions(self, user_id: int) -> Dict[str, List[Dict[str, Any]]]:
-        """Get all interactions for a specific user."""
-
-        browsing = [b for b in self.browsing_history if b["user_id"] == user_id]
-        purchases = [p for p in self.purchase_history if p["user_id"] == user_id]
-
-        return {"browsing": browsing, "purchases": purchases}
-
-    def get_product_interactions(
-        self, product_id: int
-    ) -> Dict[str, List[Dict[str, Any]]]:
-        """Get all interactions for a specific product."""
-
-        browsing = [b for b in self.browsing_history if b["product_id"] == product_id]
-        purchases = [p for p in self.purchase_history if p["product_id"] == product_id]
-
-        return {"browsing": browsing, "purchases": purchases}
-
-    def create_user_product_matrix(self, interaction_type: str = "all") -> pd.DataFrame:
-        """
-        Create a user-product interaction matrix.
-
-        Parameters:
-        - interaction_type: 'browsing', 'purchase', or 'all'
-
-        Returns:
-        - user_product_matrix: DataFrame with users as rows, products as columns, values as interaction strength
-        """
-        interactions = []
-
-        if interaction_type in ["browsing", "all"]:
-            for interaction in self.browsing_history:
-                interactions.append(
-                    {
-                        "user_id": interaction["user_id"],
-                        "product_id": interaction["product_id"],
-                        "value": 1,  # Value of 1 for a view
-                    }
-                )
-
-        if interaction_type in ["purchase", "all"]:
-            for interaction in self.purchase_history:
-                interactions.append(
-                    {
-                        "user_id": interaction["user_id"],
-                        "product_id": interaction["product_id"],
-                        "value": 5
-                        * interaction.get(
-                            "quantity", 1
-                        ),  # Value of 5 * quantity for a purchase
-                    }
-                )
-
-        # Create DataFrame from interactions
-        interactions_data_frame = pd.DataFrame(interactions)
-
-        # If there are multiple interactions between the same user and product, aggregate them
-        interactions_data_frame = (
-            interactions_data_frame.groupby(["user_id", "product_id"])
-            .sum()
-            .reset_index()
-        )
-
-        # Create the matrix
-        user_product_matrix = interactions_data_frame.pivot(
-            index="user_id", columns="product_id", values="value"
-        ).fillna(0)
-
-        return user_product_matrix
-
-
-class SimilarityCalculator:
-    """Calculates similarities between users and between products."""
-
-    def __init__(self, data_loader: DataLoader) -> None:
-        self.data_loader = data_loader
-        self.user_similarity_matrix: Optional[pd.DataFrame] = None
-        self.product_similarity_matrix: Optional[pd.DataFrame] = None
-
-    def calculate_user_similarities(self) -> pd.DataFrame:
-        """Calculate similarities between users based on their interactions."""
-        user_product_matrix = self.data_loader.create_user_product_matrix()
-
-        # If matrix is empty, return empty similarity matrix
-        if user_product_matrix.empty:
-            logger.warning(
-                "User-item matrix is empty, cannot calculate user similarities"
-            )
-            return pd.DataFrame()
-
-        # Calculate cosine similarity
-        user_similarity = cosine_similarity(user_product_matrix)
-
-        # Convert to DataFrame for easier manipulation
-        self.user_similarity_matrix = pd.DataFrame(
-            user_similarity,
-            index=user_product_matrix.index,
-            columns=user_product_matrix.index,
-        )
-
-        return self.user_similarity_matrix
-
-    def calculate_product_similarities(self) -> pd.DataFrame:
-        """Calculate similarities between products based on user interactions."""
-        user_product_matrix = self.data_loader.create_user_product_matrix()
-
-        # If matrix is empty, return empty similarity matrix
-        if user_product_matrix.empty:
-            logger.warning(
-                "User-item matrix is empty, cannot calculate product similarities"
-            )
-            return pd.DataFrame()
-
-        # Calculate cosine similarity between products (transpose the matrix first)
-        product_similarity = cosine_similarity(user_product_matrix.T)
-
-        # Convert to DataFrame for easier manipulation
-        self.product_similarity_matrix = pd.DataFrame(
-            product_similarity,
-            index=user_product_matrix.columns,
-            columns=user_product_matrix.columns,
-        )
-
-        return self.product_similarity_matrix
-
-    def get_similar_users(self, user_id: int, n: int = 5) -> List[int]:
-        """Get top n users similar to the given user."""
-        if self.user_similarity_matrix is None:
-            self.calculate_user_similarities()
-
-        if user_id not in self.user_similarity_matrix.index:
-            logger.warning(f"User {user_id} not found in similarity matrix")
-            return []
-
-        # Get similarities for the user
-        similarities = self.user_similarity_matrix.loc[user_id]
-
-        # Sort and get top n (excluding the user itself)
-        similar_users = (
-            similarities.sort_values(ascending=False)
-            .drop(user_id, errors="ignore")
-            .head(n)
-        )
-
-        return similar_users.index.tolist()
-
-    def get_similar_products(self, product_id: int, n: int = 5) -> List[int]:
-        """Get top n products similar to the given product."""
-        if self.product_similarity_matrix is None:
-            self.calculate_product_similarities()
-
-        if product_id not in self.product_similarity_matrix.index:
-            logger.warning(f"Product {product_id} not found in similarity matrix")
-            return []
-
-        # Get similarities for the product
-        similarities = self.product_similarity_matrix.loc[product_id]
-
-        # Sort and get top n (excluding the product itself)
-        similar_products = (
-            similarities.sort_values(ascending=False)
-            .drop(product_id, errors="ignore")
-            .head(n)
-        )
-
-        return similar_products.index.tolist()
-
-    def calculate_product_content_similarity(self, product1: int, product2: int):
-        """Calculate content-based similarity between two products."""
-        p1 = self.data_loader.products[product1]
-        p2 = self.data_loader.products[product2]
-
-        # Calculate similarity based on tags
-        tags1 = set(p1["tags"])
-        tags2 = set(p2["tags"])
-
-        tag_similarity = len(tags1.intersection(tags2)) / max(
-            len(tags1.union(tags2)), 1
-        )
-
-        # Category similarity (1 if same, 0 if different)
-        category_similarity = 1 if p1["category"] == p2["category"] else 0
-
-        # Rating similarity
-        rating_similarity = 1 - abs(p1["rating"] - p2["rating"]) / 5
-
-        # Weighted combination
-        similarity = (
-            0.5 * tag_similarity + 0.3 * category_similarity + 0.2 * rating_similarity
-        )
-
-        return similarity
-
-
 class UserBasedRecommender:
     """Generates recommendations based on similar users' behaviors."""
 
     def __init__(
         self,
-        data_loader: DataLoader,
+        data_processor: DataProcessor,
         similarity_calculator: SimilarityCalculator,
     ) -> None:
-        self.data_loader = data_loader
+        self.data_processor = data_processor
         self.similarity_calculator = similarity_calculator
 
     def recommend(
@@ -304,7 +45,7 @@ class UserBasedRecommender:
         - List of recommended product IDs
         """
         # Get user interactions
-        user_interactions = self.data_loader.get_user_interactions(user_id)
+        user_interactions = self.data_processor.get_user_interactions(user_id)
 
         # Products the user has already interacted with
         viewed_products = set(b["product_id"] for b in user_interactions["browsing"])
@@ -331,7 +72,7 @@ class UserBasedRecommender:
         product_scores = defaultdict(float)
 
         for similar_user_id in similar_users:
-            similar_user_interactions = self.data_loader.get_user_interactions(
+            similar_user_interactions = self.data_processor.get_user_interactions(
                 similar_user_id
             )
 
@@ -360,10 +101,10 @@ class ItemBasedRecommender:
 
     def __init__(
         self,
-        data_loader: DataLoader,
+        data_processor: DataProcessor,
         similarity_calculator: SimilarityCalculator,
     ) -> None:
-        self.data_loader = data_loader
+        self.data_processor = data_processor
         self.similarity_calculator = similarity_calculator
 
     def recommend(
@@ -386,7 +127,7 @@ class ItemBasedRecommender:
         - List of recommended product IDs
         """
         # Get user interactions
-        user_interactions = self.data_loader.get_user_interactions(user_id)
+        user_interactions = self.data_processor.get_user_interactions(user_id)
 
         # Products the user has already interacted with
         viewed_products = set(b["product_id"] for b in user_interactions["browsing"])
@@ -444,8 +185,8 @@ class ItemBasedRecommender:
 class ContextualBooster:
     """Adjusts recommendation scores based on contextual signals."""
 
-    def __init__(self, data_loader: DataLoader) -> None:
-        self.data_loader = data_loader
+    def __init__(self, data_processor: DataProcessor) -> None:
+        self.data_processor = data_processor
 
     def boost_scores(
         self,
@@ -468,7 +209,7 @@ class ContextualBooster:
             current_time = datetime.now()
 
         # Get user device
-        user_device = self.data_loader.users[user_id]["device"]
+        user_device = self.data_processor.users[user_id]["device"]
 
         # Get day of week
         day_of_week = current_time.strftime("%A")
@@ -491,12 +232,12 @@ class ContextualBooster:
         boosted_scores = dict(product_scores)
 
         for product_id in product_scores:
-            product = self.data_loader.products[product_id]
+            product = self.data_processor.products[product_id]
             category = product["category"]
 
             # Boost based on contextual signals if available for the category
-            if category in self.data_loader.contextual_signals:
-                signal = self.data_loader.contextual_signals[category]
+            if category in self.data_processor.contextual_signals:
+                signal = self.data_processor.contextual_signals[category]
 
                 # Boost if current day is a peak day for the category
                 if day_of_week in signal["peak_days"]:
@@ -522,8 +263,8 @@ class ContextualBooster:
 class DiversityEnhancer:
     """Ensures diversity in the final recommendation list."""
 
-    def __init__(self, data_loader: DataLoader) -> None:
-        self.data_loader = data_loader
+    def __init__(self, data_processor: DataProcessor) -> None:
+        self.data_processor = data_processor
 
     def enhance_diversity(
         self,
@@ -547,7 +288,7 @@ class DiversityEnhancer:
         categories = defaultdict(list)
 
         for product_id, score in recommendations:
-            category = self.data_loader.products[product_id]["category"]
+            category = self.data_processor.products[product_id]["category"]
             categories[category].append((product_id, score))
 
         # Sort products within each category by score
@@ -591,10 +332,10 @@ class ExplanationGenerator:
 
     def __init__(
         self,
-        data_loader: DataLoader,
+        data_processor: DataProcessor,
         similarity_calculator: SimilarityCalculator,
     ):
-        self.data_loader = data_loader
+        self.data_processor = data_processor
         self.similarity_calculator = similarity_calculator
 
     def generate_explanation(
@@ -614,7 +355,7 @@ class ExplanationGenerator:
         Returns:
         - Explanation string
         """
-        product = self.data_loader.products[product_id]
+        product = self.data_processor.products[product_id]
 
         if recommendation_source == "user_based":
             return (
@@ -623,7 +364,7 @@ class ExplanationGenerator:
 
         elif recommendation_source == "item_based":
             # Find a product the user interacted with that's similar to this one
-            user_interactions = self.data_loader.get_user_interactions(user_id)
+            user_interactions = self.data_processor.get_user_interactions(user_id)
             interacted_products = set(
                 b["product_id"] for b in user_interactions["browsing"]
             ).union(set(p["product_id"] for p in user_interactions["purchases"]))
@@ -643,7 +384,7 @@ class ExplanationGenerator:
                     most_similar_product = interacted_product_id
 
             if most_similar_product:
-                similar_product = self.data_loader.products[most_similar_product]
+                similar_product = self.data_processor.products[most_similar_product]
                 return f"Recommended because it's similar to {similar_product['name']} that you viewed earlier."
             else:
                 return f"Recommended because it matches your browsing preferences."
@@ -659,8 +400,8 @@ class ExplanationGenerator:
             current_time = datetime.now()
             day_of_week = current_time.strftime("%A")
 
-            if product["category"] in self.data_loader.contextual_signals:
-                signal = self.data_loader.contextual_signals[product["category"]]
+            if product["category"] in self.data_processor.contextual_signals:
+                signal = self.data_processor.contextual_signals[product["category"]]
 
                 if day_of_week in signal["peak_days"]:
                     return f"Popular {product['category']} choice for {day_of_week}."
@@ -676,19 +417,19 @@ class ExplanationGenerator:
 class RecommendationManager:
     """Orchestrates the entire recommendation process."""
 
-    def __init__(self, data_loader: DataLoader) -> None:
-        self.data_loader = data_loader
-        self.similarity_calculator = SimilarityCalculator(data_loader)
+    def __init__(self, data_processor: DataProcessor) -> None:
+        self.data_processor = data_processor
+        self.similarity_calculator = SimilarityCalculator(data_processor)
         self.user_based_recommender = UserBasedRecommender(
-            data_loader, self.similarity_calculator
+            data_processor, self.similarity_calculator
         )
         self.item_based_recommender = ItemBasedRecommender(
-            data_loader, self.similarity_calculator
+            data_processor, self.similarity_calculator
         )
-        self.contextual_booster = ContextualBooster(data_loader)
-        self.diversity_enhancer = DiversityEnhancer(data_loader)
+        self.contextual_booster = ContextualBooster(data_processor)
+        self.diversity_enhancer = DiversityEnhancer(data_processor)
         self.explanation_generator = ExplanationGenerator(
-            data_loader, self.similarity_calculator
+            data_processor, self.similarity_calculator
         )
 
         # Pre-compute similarities
@@ -709,7 +450,7 @@ class RecommendationManager:
         - Dictionary of candidate product IDs with initial scores
         """
         # Get user interactions
-        user_interactions = self.data_loader.get_user_interactions(user_id)
+        user_interactions = self.data_processor.get_user_interactions(user_id)
 
         # Initialize candidate dictionary
         candidates = {}
@@ -741,11 +482,11 @@ class RecommendationManager:
         # 4. Popular products in user's preferred categories
         if user_interactions["purchases"]:
             preferred_categories = set(
-                self.data_loader.products[p["product_id"]]["category"]
+                self.data_processor.products[p["product_id"]]["category"]
                 for p in user_interactions["purchases"]
             )
 
-            for product_id, product in self.data_loader.products.items():
+            for product_id, product in self.data_processor.products.items():
                 if (
                     product["category"] in preferred_categories
                     and product_id not in candidates
@@ -753,8 +494,10 @@ class RecommendationManager:
                     candidates[product_id] = 2.0
 
         # 5. Trending products (simplified)
-        for product_id, product in self.data_loader.products.items():
-            product_interactions = self.data_loader.get_product_interactions(product_id)
+        for product_id, product in self.data_processor.products.items():
+            product_interactions = self.data_processor.get_product_interactions(
+                product_id
+            )
             interaction_count = len(product_interactions["browsing"]) + len(
                 product_interactions["purchases"]
             )
@@ -802,12 +545,12 @@ class RecommendationManager:
         - List of recommended products (with explanations if requested)
         """
         # Check if user exists
-        if user_id not in self.data_loader.users:
+        if user_id not in self.data_processor.users:
             logger.warning(f"User {user_id} not found")
             return []
 
         # Get user interactions
-        user_interactions = self.data_loader.get_user_interactions(user_id)
+        user_interactions = self.data_processor.get_user_interactions(user_id)
 
         # Handle cold start scenario for new users
         if not user_interactions["browsing"] and not user_interactions["purchases"]:
@@ -815,8 +558,8 @@ class RecommendationManager:
 
             # Recommend popular products across categories
             candidates = {}
-            for product_id, product in self.data_loader.products.items():
-                product_interactions = self.data_loader.get_product_interactions(
+            for product_id, product in self.data_processor.products.items():
+                product_interactions = self.data_processor.get_product_interactions(
                     product_id
                 )
                 interaction_count = len(product_interactions["browsing"]) + len(
@@ -832,7 +575,7 @@ class RecommendationManager:
                 return [
                     {
                         "product_id": pid,
-                        "product_name": self.data_loader.products[pid]["name"],
+                        "product_name": self.data_processor.products[pid]["name"],
                         "explanation": "Recommended as a popular product for new users",
                     }
                     for pid in recommended_product_ids
@@ -866,7 +609,7 @@ class RecommendationManager:
         if include_explanations:
             result = []
             for product_id in diverse_recommendations:
-                product = self.data_loader.products[product_id]
+                product = self.data_processor.products[product_id]
 
                 # Determine the source of the recommendation
                 source = "item_based"  # Default source
