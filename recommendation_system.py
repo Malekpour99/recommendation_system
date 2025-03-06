@@ -4,7 +4,7 @@ import pandas as pd
 from datetime import datetime
 from collections import defaultdict
 from sklearn.metrics.pairwise import cosine_similarity
-from typing import List, Dict, Tuple, Optional, Set, Any
+from typing import List, Dict, Tuple, Optional, Any
 
 
 # Configure logging
@@ -17,16 +17,21 @@ logger = logging.getLogger(__name__)
 class DataLoader:
     """Loads and preprocesses the e-commerce data for the recommendation system."""
 
-    def __init__(self):
-        self.users = {}
-        self.products = {}
-        self.browsing_history = []
-        self.purchase_history = []
-        self.contextual_signals = {}
+    def __init__(self) -> None:
+        self.users: Dict[int, Dict[str, Any]] = {}
+        self.products: Dict[int, Dict[str, Any]] = {}
+        self.browsing_history: List[Dict[str, Any]] = []
+        self.purchase_history: List[Dict[str, Any]] = []
+        self.contextual_signals: Dict[str, Dict[str, Any]] = {}
 
     def load_data(
-        self, users_data, products_data, browsing_data, purchase_data, contextual_data
-    ):
+        self,
+        users_data: List[Dict[str, Any]],
+        products_data: List[Dict[str, Any]],
+        browsing_data: List[Dict[str, Any]],
+        purchase_data: List[Dict[str, Any]],
+        contextual_data: List[Dict[str, Any]],
+    ) -> None:
         """Load data from the provided datasets."""
         # Load users
         for user in users_data:
@@ -54,7 +59,7 @@ class DataLoader:
             f"Loaded {len(self.browsing_history)} browsing events, {len(self.purchase_history)} purchase events"
         )
 
-    def _convert_timestamps(self):
+    def _convert_timestamps(self) -> None:
         """Convert all timestamps to datetime objects."""
         for interaction in self.browsing_history + self.purchase_history:
             # If timestamp is already a datetime, skip
@@ -74,7 +79,7 @@ class DataLoader:
                     # Optionally, set to a default timestamp or current time
                     interaction["timestamp"] = datetime.now()
 
-    def get_user_interactions(self, user_id):
+    def get_user_interactions(self, user_id: int) -> Dict[str, List[Dict[str, Any]]]:
         """Get all interactions for a specific user."""
 
         browsing = [b for b in self.browsing_history if b["user_id"] == user_id]
@@ -82,7 +87,9 @@ class DataLoader:
 
         return {"browsing": browsing, "purchases": purchases}
 
-    def get_product_interactions(self, product_id):
+    def get_product_interactions(
+        self, product_id: int
+    ) -> Dict[str, List[Dict[str, Any]]]:
         """Get all interactions for a specific product."""
 
         browsing = [b for b in self.browsing_history if b["product_id"] == product_id]
@@ -90,7 +97,7 @@ class DataLoader:
 
         return {"browsing": browsing, "purchases": purchases}
 
-    def create_user_item_matrix(self, interaction_type="all"):
+    def create_user_item_matrix(self, interaction_type: str = "all") -> pd.DataFrame:
         """
         Create a user-item interaction matrix.
 
@@ -146,12 +153,12 @@ class DataLoader:
 class SimilarityCalculator:
     """Calculates similarities between users and between products."""
 
-    def __init__(self, data_loader):
+    def __init__(self, data_loader: DataLoader) -> None:
         self.data_loader = data_loader
-        self.user_similarity_matrix = None
-        self.product_similarity_matrix = None
+        self.user_similarity_matrix: Optional[pd.DataFrame] = None
+        self.product_similarity_matrix: Optional[pd.DataFrame] = None
 
-    def calculate_user_similarities(self):
+    def calculate_user_similarities(self) -> pd.DataFrame:
         """Calculate similarities between users based on their interactions."""
         user_item_matrix = self.data_loader.create_user_item_matrix()
 
@@ -174,7 +181,7 @@ class SimilarityCalculator:
 
         return self.user_similarity_matrix
 
-    def calculate_product_similarities(self):
+    def calculate_product_similarities(self) -> pd.DataFrame:
         """Calculate similarities between products based on user interactions."""
         user_item_matrix = self.data_loader.create_user_item_matrix()
 
@@ -197,7 +204,7 @@ class SimilarityCalculator:
 
         return self.product_similarity_matrix
 
-    def get_similar_users(self, user_id, n=5):
+    def get_similar_users(self, user_id: int, n: int = 5) -> List[int]:
         """Get top n users similar to the given user."""
         if self.user_similarity_matrix is None:
             self.calculate_user_similarities()
@@ -218,7 +225,7 @@ class SimilarityCalculator:
 
         return similar_users.index.tolist()
 
-    def get_similar_products(self, product_id, n=5):
+    def get_similar_products(self, product_id: int, n: int = 5) -> List[int]:
         """Get top n products similar to the given product."""
         if self.product_similarity_matrix is None:
             self.calculate_product_similarities()
@@ -239,7 +246,7 @@ class SimilarityCalculator:
 
         return similar_products.index.tolist()
 
-    def calculate_product_content_similarity(self, product1, product2):
+    def calculate_product_content_similarity(self, product1: int, product2: int):
         """Calculate content-based similarity between two products."""
         p1 = self.data_loader.products[product1]
         p2 = self.data_loader.products[product2]
@@ -269,11 +276,21 @@ class SimilarityCalculator:
 class UserBasedRecommender:
     """Generates recommendations based on similar users' behaviors."""
 
-    def __init__(self, data_loader, similarity_calculator):
+    def __init__(
+        self,
+        data_loader: DataLoader,
+        similarity_calculator: SimilarityCalculator,
+    ) -> None:
         self.data_loader = data_loader
         self.similarity_calculator = similarity_calculator
 
-    def recommend(self, user_id, n=5, exclude_viewed=False, exclude_purchased=True):
+    def recommend(
+        self,
+        user_id: int,
+        n: int = 5,
+        exclude_viewed: bool = False,
+        exclude_purchased: bool = True,
+    ) -> List[int]:
         """
         Generate recommendations for a user based on similar users' interactions.
 
@@ -341,11 +358,21 @@ class UserBasedRecommender:
 class ItemBasedRecommender:
     """Generates recommendations based on similar products."""
 
-    def __init__(self, data_loader, similarity_calculator):
+    def __init__(
+        self,
+        data_loader: DataLoader,
+        similarity_calculator: SimilarityCalculator,
+    ) -> None:
         self.data_loader = data_loader
         self.similarity_calculator = similarity_calculator
 
-    def recommend(self, user_id, n=5, exclude_viewed=False, exclude_purchased=True):
+    def recommend(
+        self,
+        user_id: int,
+        n: int = 5,
+        exclude_viewed: bool = False,
+        exclude_purchased: bool = True,
+    ) -> List[int]:
         """
         Generate recommendations for a user based on similar products.
 
@@ -417,10 +444,15 @@ class ItemBasedRecommender:
 class ContextualBooster:
     """Adjusts recommendation scores based on contextual signals."""
 
-    def __init__(self, data_loader):
+    def __init__(self, data_loader: DataLoader) -> None:
         self.data_loader = data_loader
 
-    def boost_scores(self, product_scores, user_id, current_time=None):
+    def boost_scores(
+        self,
+        product_scores: Dict[int, float],
+        user_id: int,
+        current_time: Optional[datetime] = None,
+    ) -> Dict[int, float]:
         """
         Boost product scores based on contextual signals.
 
@@ -490,10 +522,14 @@ class ContextualBooster:
 class DiversityEnhancer:
     """Ensures diversity in the final recommendation list."""
 
-    def __init__(self, data_loader):
+    def __init__(self, data_loader: DataLoader) -> None:
         self.data_loader = data_loader
 
-    def enhance_diversity(self, recommendations, n=5):
+    def enhance_diversity(
+        self,
+        recommendations: List[Tuple[int, float]],
+        n: int = 5,
+    ) -> List[int]:
         """
         Enhance diversity in the recommendation list.
 
@@ -553,11 +589,20 @@ class DiversityEnhancer:
 class ExplanationGenerator:
     """Generates explanations for recommended products."""
 
-    def __init__(self, data_loader, similarity_calculator):
+    def __init__(
+        self,
+        data_loader: DataLoader,
+        similarity_calculator: SimilarityCalculator,
+    ):
         self.data_loader = data_loader
         self.similarity_calculator = similarity_calculator
 
-    def generate_explanation(self, user_id, product_id, recommendation_source):
+    def generate_explanation(
+        self,
+        user_id: int,
+        product_id: int,
+        recommendation_source: str,
+    ) -> str:
         """
         Generate an explanation for why a product was recommended.
 
@@ -631,7 +676,7 @@ class ExplanationGenerator:
 class RecommendationManager:
     """Orchestrates the entire recommendation process."""
 
-    def __init__(self, data_loader):
+    def __init__(self, data_loader: DataLoader) -> None:
         self.data_loader = data_loader
         self.similarity_calculator = SimilarityCalculator(data_loader)
         self.user_based_recommender = UserBasedRecommender(
@@ -653,7 +698,7 @@ class RecommendationManager:
         logger.info("Pre-computing product similarities...")
         self.similarity_calculator.calculate_product_similarities()
 
-    def generate_candidates(self, user_id):
+    def generate_candidates(self, user_id: int) -> Dict[int, float]:
         """
         Generate candidate products for recommendations.
 
@@ -719,12 +764,11 @@ class RecommendationManager:
 
         return candidates
 
-    def score_candidates(self, user_id, candidates):
+    def score_candidates(self, candidates: Dict[int, float]) -> Dict[int, float]:
         """
         Score and refine candidate products.
 
         Parameters:
-        - user_id: The ID of the user
         - candidates: Dictionary of candidate product IDs with initial scores
 
         Returns:
@@ -740,7 +784,12 @@ class RecommendationManager:
 
         return scored_candidates
 
-    def get_recommendations(self, user_id, n=5, include_explanations=True):
+    def get_recommendations(
+        self,
+        user_id: int,
+        n: int = 5,
+        include_explanations: bool = True,
+    ):
         """
         Get personalized recommendations for a user.
 
@@ -795,7 +844,7 @@ class RecommendationManager:
         candidates = self.generate_candidates(user_id)
 
         # Score candidates
-        candidate_scores = self.score_candidates(user_id, candidates)
+        candidate_scores = self.score_candidates(candidates)
 
         # Boost scores based on contextual signals
         boosted_scores = self.contextual_booster.boost_scores(candidate_scores, user_id)
