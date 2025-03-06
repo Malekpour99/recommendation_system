@@ -2,11 +2,32 @@ import time
 import random
 import numpy as np
 import matplotlib.pyplot as plt
+from typing import List, Dict, Tuple
+
 from recommendation_system import DataLoader, RecommendationManager
 
 
-def generate_large_dataset(num_users: int, num_products: int, num_interactions: int):
-    """Generate a large synthetic dataset for performance testing."""
+def generate_large_dataset(
+    num_users: int, num_products: int, num_interactions: int
+) -> Tuple[
+    List[Dict[str, object]],
+    List[Dict[str, object]],
+    List[Dict[str, object]],
+    List[Dict[str, object]],
+    List[Dict[str, object]],
+]:
+    """
+    Generate a large synthetic dataset for performance testing of the recommendation system
+
+    Parameters:
+        num_users (int): The number of users in the dataset.
+        num_products (int): The number of products in the dataset.
+        num_interactions (int): The number of user-product interactions to generate.
+
+    Returns:
+        tuple: A tuple containing lists of users, products, browsing history, purchase history,
+               and contextual signals.
+    """
     users_data = [
         {
             "user_id": i,
@@ -89,13 +110,25 @@ def generate_large_dataset(num_users: int, num_products: int, num_interactions: 
 
 
 def benchmark_recommendation_performance(
-    users_data,
-    products_data,
-    browsing_history,
-    purchase_history,
-    contextual_signals,
-):
-    """Benchmark recommendation system performance."""
+    users_data: List[Dict[str, object]],
+    products_data: List[Dict[str, object]],
+    browsing_history: List[Dict[str, object]],
+    purchase_history: List[Dict[str, object]],
+    contextual_signals: List[Dict[str, object]],
+) -> List[float]:
+    """
+    Benchmark recommendation system performance.
+
+    Parameters:
+        users_data (list): A list of user data dictionaries.
+        products_data (list): A list of product data dictionaries.
+        browsing_history (list): A list of browsing interactions.
+        purchase_history (list): A list of purchase interactions.
+        contextual_signals (list): A list of contextual data affecting recommendations.
+
+    Returns:
+        list: A list of recommendation generation times for sample users.
+    """
     data_loader = DataLoader()
     data_loader.load_data(
         users_data,
@@ -111,15 +144,24 @@ def benchmark_recommendation_performance(
     recommendation_times = []
     for user_id in range(1, 11):  # Test first 10 users
         start_time = time.time()
-        recommendations = recommendation_manager.get_recommendations(user_id, n=5)
+        recommendation_manager.get_recommendations(user_id, n=5)
         end_time = time.time()
         recommendation_times.append(end_time - start_time)
 
     return recommendation_times
 
 
-def plot_performance_benchmark(dataset_sizes, performance_data):
-    """Plot recommendation generation time for different dataset sizes."""
+def plot_performance_benchmark(
+    dataset_sizes: List[int],
+    performance_data: List[float],
+) -> None:
+    """
+    Plot recommendation generation time for different dataset sizes
+
+    Parameters:
+        dataset_sizes (list): A list of dataset sizes (number of interactions).
+        performance_data (list): A list of average recommendation times corresponding to dataset sizes.
+    """
     plt.figure(figsize=(10, 6))
     plt.plot(dataset_sizes, performance_data, marker="o")
     plt.title("Recommendation System Performance")
