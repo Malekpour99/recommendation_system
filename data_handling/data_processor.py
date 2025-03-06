@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 
-# Configure logging
+# Logging Configuration
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )

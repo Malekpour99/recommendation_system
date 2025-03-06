@@ -3,7 +3,7 @@ import logging
 from data_handling.data_processor import DataProcessor
 from recommendation_system import RecommendationManager
 
-# Configure logging
+# Logging Configuration
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )

@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from data_handling.data_processor import DataProcessor
 
-# Configure logging
+# Logging Configuration
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
