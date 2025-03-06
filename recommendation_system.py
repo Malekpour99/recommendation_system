@@ -76,8 +76,6 @@ class DataLoader:
 
     def get_user_interactions(self, user_id):
         """Get all interactions for a specific user."""
-        # Ensure timestamps are converted
-        self._convert_timestamps()
 
         browsing = [b for b in self.browsing_history if b["user_id"] == user_id]
         purchases = [p for p in self.purchase_history if p["user_id"] == user_id]
@@ -86,8 +84,6 @@ class DataLoader:
 
     def get_product_interactions(self, product_id):
         """Get all interactions for a specific product."""
-        # Ensure timestamps are converted
-        self._convert_timestamps()
 
         browsing = [b for b in self.browsing_history if b["product_id"] == product_id]
         purchases = [p for p in self.purchase_history if p["product_id"] == product_id]
@@ -130,13 +126,17 @@ class DataLoader:
                 )
 
         # Create DataFrame from interactions
-        df = pd.DataFrame(interactions)
+        interactions_data_frame = pd.DataFrame(interactions)
 
-        # If there are multiple interactions between the same user and product, take the sum
-        df = df.groupby(["user_id", "product_id"]).sum().reset_index()
+        # If there are multiple interactions between the same user and product, aggregate them
+        interactions_data_frame = (
+            interactions_data_frame.groupby(["user_id", "product_id"])
+            .sum()
+            .reset_index()
+        )
 
         # Create the matrix
-        user_item_matrix = df.pivot(
+        user_item_matrix = interactions_data_frame.pivot(
             index="user_id", columns="product_id", values="value"
         ).fillna(0)
 
