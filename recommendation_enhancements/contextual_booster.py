@@ -45,10 +45,11 @@ class ContextualBooster:
         elif 9 <= month <= 11:
             season = "Fall"
         else:
+            # 12, 1, 2
             season = "Winter"
 
         # For simplicity, map Back-to-School to Fall and Holiday to Winter
-        season_mapping = {"Fall": "Back-to-School", "Winter": "Holiday"}
+        season_mapping = {"Back-to-School": "Fall", "Holiday": "Winter"}
 
         # Boost scores based on contextual signals
         boosted_scores = dict(product_scores)
