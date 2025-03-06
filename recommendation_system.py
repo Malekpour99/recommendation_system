@@ -97,15 +97,15 @@ class DataLoader:
 
         return {"browsing": browsing, "purchases": purchases}
 
-    def create_user_item_matrix(self, interaction_type: str = "all") -> pd.DataFrame:
+    def create_user_product_matrix(self, interaction_type: str = "all") -> pd.DataFrame:
         """
-        Create a user-item interaction matrix.
+        Create a user-product interaction matrix.
 
         Parameters:
         - interaction_type: 'browsing', 'purchase', or 'all'
 
         Returns:
-        - user_item_matrix: DataFrame with users as rows, items as columns, values as interaction strength
+        - user_product_matrix: DataFrame with users as rows, products as columns, values as interaction strength
         """
         interactions = []
 
@@ -143,11 +143,11 @@ class DataLoader:
         )
 
         # Create the matrix
-        user_item_matrix = interactions_data_frame.pivot(
+        user_product_matrix = interactions_data_frame.pivot(
             index="user_id", columns="product_id", values="value"
         ).fillna(0)
 
-        return user_item_matrix
+        return user_product_matrix
 
 
 class SimilarityCalculator:
@@ -160,46 +160,46 @@ class SimilarityCalculator:
 
     def calculate_user_similarities(self) -> pd.DataFrame:
         """Calculate similarities between users based on their interactions."""
-        user_item_matrix = self.data_loader.create_user_item_matrix()
+        user_product_matrix = self.data_loader.create_user_product_matrix()
 
         # If matrix is empty, return empty similarity matrix
-        if user_item_matrix.empty:
+        if user_product_matrix.empty:
             logger.warning(
                 "User-item matrix is empty, cannot calculate user similarities"
             )
             return pd.DataFrame()
 
         # Calculate cosine similarity
-        user_similarity = cosine_similarity(user_item_matrix)
+        user_similarity = cosine_similarity(user_product_matrix)
 
         # Convert to DataFrame for easier manipulation
         self.user_similarity_matrix = pd.DataFrame(
             user_similarity,
-            index=user_item_matrix.index,
-            columns=user_item_matrix.index,
+            index=user_product_matrix.index,
+            columns=user_product_matrix.index,
         )
 
         return self.user_similarity_matrix
 
     def calculate_product_similarities(self) -> pd.DataFrame:
         """Calculate similarities between products based on user interactions."""
-        user_item_matrix = self.data_loader.create_user_item_matrix()
+        user_product_matrix = self.data_loader.create_user_product_matrix()
 
         # If matrix is empty, return empty similarity matrix
-        if user_item_matrix.empty:
+        if user_product_matrix.empty:
             logger.warning(
                 "User-item matrix is empty, cannot calculate product similarities"
             )
             return pd.DataFrame()
 
         # Calculate cosine similarity between products (transpose the matrix first)
-        product_similarity = cosine_similarity(user_item_matrix.T)
+        product_similarity = cosine_similarity(user_product_matrix.T)
 
         # Convert to DataFrame for easier manipulation
         self.product_similarity_matrix = pd.DataFrame(
             product_similarity,
-            index=user_item_matrix.columns,
-            columns=user_item_matrix.columns,
+            index=user_product_matrix.columns,
+            columns=user_product_matrix.columns,
         )
 
         return self.product_similarity_matrix
