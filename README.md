@@ -16,3 +16,8 @@ Now the project is ready for use!
 run ***sample.py*** to get a sample recommendation result based on the provided sample data
 
 run ***benchmark.py*** to get a benchmark report along with a diagram based on the recommendation process preformance
+
+## Testing
+in order to test project methods and logic, just run below command:
+
+\$ ```pytest .```
