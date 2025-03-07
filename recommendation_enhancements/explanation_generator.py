@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from caching.cache_decorator import cache_result
 from data_handling.data_processor import DataProcessor
 from data_handling.similarity_calculator import SimilarityCalculator
 
@@ -15,6 +16,7 @@ class ExplanationGenerator:
         self.data_processor = data_processor
         self.similarity_calculator = similarity_calculator
 
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def generate_explanation(
         self,
         user_id: int,
