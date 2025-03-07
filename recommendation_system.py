@@ -1,8 +1,11 @@
 import heapq
 import logging
+import asyncio
 from typing import List, Dict
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor
 
+from caching.cache_decorator import cache_result
 from data_handling.data_processor import DataProcessor
 from data_handling.similarity_calculator import SimilarityCalculator
 from recommendation_enhancements.contextual_booster import ContextualBooster
@@ -27,6 +30,26 @@ class UserBasedRecommender:
         self.data_processor = data_processor
         self.similarity_calculator = similarity_calculator
 
+    async def recommend_async(
+        self,
+        user_id: int,
+        n: int = 5,
+        exclude_viewed: bool = False,
+        exclude_purchased: bool = True,
+    ) -> List[int]:
+        """Asynchronously generate recommendations for a user based on similar users' interactions."""
+        loop = asyncio.get_event_loop()
+
+        # Run the CPU-intensive task in a thread pool
+        with ThreadPoolExecutor() as executor:
+            recommendations = await loop.run_in_executor(
+                executor,
+                lambda: self.recommend(user_id, n, exclude_viewed, exclude_purchased),
+            )
+
+        return recommendations
+
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def recommend(
         self,
         user_id: int,
@@ -109,6 +132,26 @@ class ItemBasedRecommender:
         self.data_processor = data_processor
         self.similarity_calculator = similarity_calculator
 
+    async def recommend_async(
+        self,
+        user_id: int,
+        n: int = 5,
+        exclude_viewed: bool = False,
+        exclude_purchased: bool = True,
+    ) -> List[int]:
+        """Asynchronously generate recommendations for a user based on similar products."""
+        loop = asyncio.get_event_loop()
+
+        # Run the CPU-intensive task in a thread pool
+        with ThreadPoolExecutor() as executor:
+            recommendations = await loop.run_in_executor(
+                executor,
+                lambda: self.recommend(user_id, n, exclude_viewed, exclude_purchased),
+            )
+
+        return recommendations
+
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def recommend(
         self,
         user_id: int,
