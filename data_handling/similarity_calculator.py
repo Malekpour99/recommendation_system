@@ -1,8 +1,11 @@
 import logging
+import asyncio
 import pandas as pd
-from sklearn.metrics.pairwise import cosine_similarity
 from typing import List, Optional
+from concurrent.futures import ProcessPoolExecutor
+from sklearn.metrics.pairwise import cosine_similarity
 
+from caching.cache_decorator import cache_result
 from data_handling.data_processor import DataProcessor
 
 # Logging Configuration
@@ -19,6 +22,18 @@ class SimilarityCalculator:
         self.data_processor = data_processor
         self.user_similarity_matrix: Optional[pd.DataFrame] = None
         self.product_similarity_matrix: Optional[pd.DataFrame] = None
+
+    async def calculate_user_similarities_async(self) -> pd.DataFrame:
+        """Asynchronously calculate similarities between users based on their interactions."""
+        loop = asyncio.get_event_loop()
+
+        # Run the CPU-intensive task in a process pool
+        with ProcessPoolExecutor() as executor:
+            user_similarity_matrix = await loop.run_in_executor(
+                executor, self.calculate_user_similarities
+            )
+
+        return user_similarity_matrix
 
     def calculate_user_similarities(self) -> pd.DataFrame:
         """Calculate similarities between users based on their interactions."""
@@ -43,6 +58,18 @@ class SimilarityCalculator:
 
         return self.user_similarity_matrix
 
+    async def calculate_product_similarities_async(self) -> pd.DataFrame:
+        """Asynchronously calculate similarities between products."""
+        loop = asyncio.get_event_loop()
+
+        # Run the CPU-intensive task in a process pool
+        with ProcessPoolExecutor() as executor:
+            product_similarity_matrix = await loop.run_in_executor(
+                executor, self.calculate_product_similarities
+            )
+
+        return product_similarity_matrix
+
     def calculate_product_similarities(self) -> pd.DataFrame:
         """Calculate similarities between products based on user interactions."""
         user_product_matrix = self.data_processor.create_user_product_matrix()
@@ -66,6 +93,7 @@ class SimilarityCalculator:
 
         return self.product_similarity_matrix
 
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def get_similar_users(self, user_id: int, n: int = 5) -> List[int]:
         """Get top n users similar to the given user."""
         if self.user_similarity_matrix is None:
@@ -87,6 +115,7 @@ class SimilarityCalculator:
 
         return similar_users.index.tolist()
 
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def get_similar_products(self, product_id: int, n: int = 5) -> List[int]:
         """Get top n products similar to the given product."""
         if self.product_similarity_matrix is None:
