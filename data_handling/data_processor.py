@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Any
 
+from caching.cache_decorator import cache_result
 
 # Logging Configuration
 logging.basicConfig(
@@ -76,6 +77,7 @@ class DataProcessor:
                     # Optionally, set to a default timestamp or current time
                     interaction["timestamp"] = datetime.now()
 
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def get_user_interactions(self, user_id: int) -> Dict[str, List[Dict[str, Any]]]:
         """Get all interactions for a specific user."""
 
@@ -84,6 +86,7 @@ class DataProcessor:
 
         return {"browsing": browsing, "purchases": purchases}
 
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def get_product_interactions(
         self, product_id: int
     ) -> Dict[str, List[Dict[str, Any]]]:
@@ -94,6 +97,7 @@ class DataProcessor:
 
         return {"browsing": browsing, "purchases": purchases}
 
+    @cache_result(ttl_seconds=3600)  # 1 hour
     def create_user_product_matrix(self, interaction_type: str = "all") -> pd.DataFrame:
         """
         Create a user-product interaction matrix.
