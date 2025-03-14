@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from data_handling.data_processor import DataProcessor
+from common.const import SEASON_BOOST_WEIGHT, PEAK_DAY_BOOST_WEIGHT, DEVICE_BOOST_WEIGHT
 
 
 class ContextualBooster:
@@ -64,20 +65,20 @@ class ContextualBooster:
 
                 # Boost if current day is a peak day for the category
                 if day_of_week in signal["peak_days"]:
-                    boosted_scores[product_id] *= 1.2
+                    boosted_scores[product_id] *= PEAK_DAY_BOOST_WEIGHT
 
                 # Boost if current season matches the category's peak season
                 mapped_season = season_mapping.get(season, season)
                 if signal["season"] == mapped_season or signal["season"] == "All Year":
-                    boosted_scores[product_id] *= 1.3
+                    boosted_scores[product_id] *= SEASON_BOOST_WEIGHT
 
             # Boost based on device type (simplified)
             # Assume mobile users prefer certain categories
             if user_device == "mobile":
                 if category in ["Electronics", "Accessories"]:
-                    boosted_scores[product_id] *= 1.1
+                    boosted_scores[product_id] *= DEVICE_BOOST_WEIGHT
             else:  # desktop
                 if category in ["Office Supplies"]:
-                    boosted_scores[product_id] *= 1.1
+                    boosted_scores[product_id] *= DEVICE_BOOST_WEIGHT
 
         return boosted_scores
