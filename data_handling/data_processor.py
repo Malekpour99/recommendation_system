@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import List, Dict, Any
 
 from caching.cache_decorator import cache_result
+from common.const import VIEW_VALUE, PURCHASE_VALUE
 
 # Logging Configuration
 logging.basicConfig(
@@ -116,7 +117,7 @@ class DataProcessor:
                     {
                         "user_id": interaction["user_id"],
                         "product_id": interaction["product_id"],
-                        "value": 1,  # Value of 1 for a view
+                        "value": VIEW_VALUE,  # Value of a view
                     }
                 )
 
@@ -126,7 +127,7 @@ class DataProcessor:
                     {
                         "user_id": interaction["user_id"],
                         "product_id": interaction["product_id"],
-                        "value": 5
+                        "value": PURCHASE_VALUE
                         * interaction.get(
                             "quantity", 1
                         ),  # Value of 5 * quantity for a purchase
