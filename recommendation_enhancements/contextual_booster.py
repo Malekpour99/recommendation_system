@@ -2,7 +2,14 @@ from datetime import datetime
 from typing import Dict, Optional
 
 from data_handling.data_processor import DataProcessor
-from common.const import SEASON_BOOST_WEIGHT, PEAK_DAY_BOOST_WEIGHT, DEVICE_BOOST_WEIGHT
+from common.const import (
+    SEASON_MAPPING,
+    SEASON_BOOST_WEIGHT,
+    DEVICE_BOOST_WEIGHT,
+    PEAK_DAY_BOOST_WEIGHT,
+    MOBILE_USER_INTEREST_CATEGORIES,
+    DESKTOP_USER_INTEREST_CATEGORIES,
+)
 
 
 class ContextualBooster:
@@ -49,8 +56,8 @@ class ContextualBooster:
             # 12, 1, 2
             season = "Winter"
 
-        # For simplicity, map Back-to-School to Fall and Holiday to Winter
-        season_mapping = {"Back-to-School": "Fall", "Holiday": "Winter"}
+        # For simplicity, mapped seasons
+        season_mapping = SEASON_MAPPING
 
         # Boost scores based on contextual signals
         boosted_scores = dict(product_scores)
@@ -75,10 +82,10 @@ class ContextualBooster:
             # Boost based on device type (simplified)
             # Assume mobile users prefer certain categories
             if user_device == "mobile":
-                if category in ["Electronics", "Accessories"]:
+                if category in MOBILE_USER_INTEREST_CATEGORIES:
                     boosted_scores[product_id] *= DEVICE_BOOST_WEIGHT
             else:  # desktop
-                if category in ["Office Supplies"]:
+                if category in DESKTOP_USER_INTEREST_CATEGORIES:
                     boosted_scores[product_id] *= DEVICE_BOOST_WEIGHT
 
         return boosted_scores
