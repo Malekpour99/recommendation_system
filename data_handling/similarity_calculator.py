@@ -7,6 +7,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from caching.cache_decorator import cache_result
 from data_handling.data_processor import DataProcessor
+from common.const import (
+    TAG_SIMILARITY_WEIGHT,
+    RATING_SIMILARITY_WEIGHT,
+    CATEGORY_SIMILARITY_WEIGHT,
+)
 
 # Logging Configuration
 logging.basicConfig(
@@ -158,7 +163,9 @@ class SimilarityCalculator:
 
         # Weighted combination
         similarity = (
-            0.5 * tag_similarity + 0.3 * category_similarity + 0.2 * rating_similarity
+            TAG_SIMILARITY_WEIGHT * tag_similarity
+            + CATEGORY_SIMILARITY_WEIGHT * category_similarity
+            + RATING_SIMILARITY_WEIGHT * rating_similarity
         )
 
         return similarity
